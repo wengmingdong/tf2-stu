@@ -121,9 +121,10 @@ if is_train:
             cur_idx += batch_size
 
         print(model.feature_user[0:1])
+        #保存权重
         model.saveVariables()
 else:
-    model.restoreVariables()
+    model.restoreVariables() #读取权重
 
 print('===========================================')
 u1rate = tf.squeeze(tf.matmul(model.feature_user[0:1], model.feature_item, transpose_b=True))
@@ -138,9 +139,3 @@ print(u1rate);
 np.set_printoptions(threshold=sys.maxsize)
 print(tf.argsort(u1rate, direction='DESCENDING')[0:10].numpy())
 print('===========================================')
-
-
-
-
-
-
