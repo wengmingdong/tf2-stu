@@ -9,15 +9,21 @@ is_train = True
 
 class Model(object):
     def __init__(self, num_users, num_items, k):
+        #用户类型数
         self.num_users = num_users
+        #物品数
         self.num_items = num_items
+        #特征数
         self.k = k
+        #用户感兴趣物品类型特征embedding
         self.feature_user = tf.Variable(tf.random.normal([num_users, k]))  # 生成10*1的张量
+        #物品类型特征embedding
         self.feature_item = tf.Variable(tf.random.normal([num_items, k]))
         self.ckpt = self.makeCheckpoint()
     def __call__(self, user_ids, item_ids):
         embbeding_u = tf.nn.embedding_lookup(self.feature_user, list(np.array(user_ids)-1))
         embbeding_i = tf.nn.embedding_lookup(self.feature_item, list(np.array(item_ids)-1))
+        #user_feature*item_feature转置，获取用户与某个物品的评价（对角线上的值）
         rt_ui = tf.linalg.diag_part(tf.matmul(embbeding_u, embbeding_i, transpose_b=True))
         return rt_ui
 
@@ -38,6 +44,7 @@ class Model(object):
         self.ckpt.save('./save/ckpt')
 
     def restoreVariables(self):
+        #恢复self.feature_user和self.feature_item值
         status = self.ckpt.restore(tf.train.latest_checkpoint('./save'))
         status.assert_consumed()  # Optional check
 
