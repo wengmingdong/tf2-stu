@@ -1,9 +1,11 @@
 import tensorflow as tf
 import numpy as np
 import pandas as pd
+import sys
 from sklearn import preprocessing
 
 learning_rate = 0.1
+is_train = True
 
 class Model(object):
     def __init__(self, num_users, num_items, k):
@@ -12,6 +14,7 @@ class Model(object):
         self.k = k
         self.feature_user = tf.Variable(tf.random.normal([num_users, k]))  # 生成10*1的张量
         self.feature_item = tf.Variable(tf.random.normal([num_items, k]))
+        self.ckpt = self.makeCheckpoint()
     def __call__(self, user_ids, item_ids):
         embbeding_u = tf.nn.embedding_lookup(self.feature_user, list(np.array(user_ids)-1))
         embbeding_i = tf.nn.embedding_lookup(self.feature_item, list(np.array(item_ids)-1))
@@ -25,6 +28,18 @@ class Model(object):
     def get_items_embbeding(self, item_ids):
         embbeding_i = tf.nn.embedding_lookup(self.feature_item, list(np.array(item_ids)-1))
         return embbeding_i
+
+    def makeCheckpoint(self):
+        return tf.train.Checkpoint(
+            feature_user=self.feature_user,
+            feature_item=self.feature_item)
+
+    def saveVariables(self):
+        self.ckpt.save('./save/ckpt')
+
+    def restoreVariables(self):
+        status = self.ckpt.restore(tf.train.latest_checkpoint('./save'))
+        status.assert_consumed()  # Optional check
 
 def loss(predicted_y, desired_y, embbeding_u, embbeding_i, ld):
   plos = tf.reduce_mean(tf.square(predicted_y - desired_y))
@@ -45,6 +60,8 @@ def train(model, inputs_user_ids, inputs_item_ids, outputs, idx):
 
     gradients = t.gradient(current_loss, [model.feature_user, model.feature_item])
     optimizer.apply_gradients(zip(gradients, [model.feature_user, model.feature_item]))
+
+
 
 df = pd.read_csv('./data/ml-1m/ratings.dat', sep='\t', names=['user', 'item', 'rating', 'timestamp'], header=None)
 df = df.drop('timestamp', axis=1)
@@ -72,31 +89,51 @@ max_item_id = np.amax(item_ids)
 
 model = Model(max_user_id, max_item_id, 20)
 
-print(model.feature_user[:10])
+if is_train:
+    print(model.feature_user[:10])
 
-max_len = len(user_ids)
-batch_size = 1000
-epochs = range(1000)
-for epoch in epochs:
-    cur_idx = 0
-    print('Epoch %2d' % (epoch))
-    while True:
-        start_idx = cur_idx
-        end_idx = cur_idx + batch_size
-        if start_idx >= max_len:
-            break
-        if end_idx > max_len:
-            end_idx = max_len
+    max_len = len(user_ids)
+    batch_size = 2000
+    epochs = range(1000)
+    for epoch in epochs:
+        cur_idx = 0
+        print('Epoch %2d' % (epoch))
+        while True:
+            start_idx = cur_idx
+            end_idx = cur_idx + batch_size
+            if start_idx >= max_len:
+                break
+            if end_idx > max_len:
+                end_idx = max_len
 
-        cur_user_ids = user_ids[start_idx:end_idx]
-        cur_item_ids = item_ids[start_idx:end_idx]
-        cur_outputs = outputs[start_idx:end_idx]
+            cur_user_ids = user_ids[start_idx:end_idx]
+            cur_item_ids = item_ids[start_idx:end_idx]
+            cur_outputs = outputs[start_idx:end_idx]
 
-        train(model, cur_user_ids, cur_item_ids, cur_outputs, cur_idx)
-        cur_idx += batch_size
+            train(model, cur_user_ids, cur_item_ids, cur_outputs, cur_idx)
+            cur_idx += batch_size
+
+        print(model.feature_user[0:1])
+        model.saveVariables()
+else:
+    model.restoreVariables()
+
+print('===========================================')
+u1rate = tf.squeeze(tf.matmul(model.feature_user[0:1], model.feature_item, transpose_b=True))
+print(u1rate);
+# 获取最大值的前10个物品
+print(tf.argsort(u1rate, direction='DESCENDING')[0:10])
+print('===========================================')
+
+u1rate = tf.squeeze(tf.matmul(model.feature_user[1:2], model.feature_item, transpose_b=True))
+print(u1rate);
+# 获取最大值的前10个物品
+np.set_printoptions(threshold=sys.maxsize)
+print(tf.argsort(u1rate, direction='DESCENDING')[0:10].numpy())
+print('===========================================')
 
 
-print(model.feature_user[:10])
+
 
 
 
